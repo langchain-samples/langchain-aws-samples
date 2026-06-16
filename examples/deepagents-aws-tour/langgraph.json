@@ -1,0 +1,11 @@
+{
+  "graphs": {
+    "support_tour": "./graph.py:graph"
+  },
+  "python_version": "3.11",
+  "env": "./.env",
+  "dependencies": ["."],
+  "store": {
+    "path": "./store.py:generate_store"
+  }
+}

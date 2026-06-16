@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  secrets:
+    name: No committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Examples are self-contained and bring their own tooling, linting, and tests.
+      # CI here only guards against committing real .env files.
+      - name: No committed .env files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::A real .env file is committed. Remove it."
+            exit 1
+          fi

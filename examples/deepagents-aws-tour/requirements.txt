@@ -1,0 +1,27 @@
+# Standalone pip fallback.
+# Preferred install path is `uv sync` from pyproject.toml. Use this file only when
+# an environment cannot use uv.
+
+deepagents>=0.6.7
+langchain>=1.3.2
+langchain-core>=1.0.0
+langgraph>=1.2.2
+langchain-aws>=1.5.0
+langsmith>=0.8.7
+langgraph-cli[inmem]>=0.4.27
+langgraph-sdk
+python-dotenv
+boto3
+bedrock-agentcore
+langchain-agentcore-codeinterpreter>=0.0.4
+openevals
+agentevals
+jupyterlab
+ipykernel
+ipywidgets
+
+# CDK provisioning dependencies. These match the `cdk` optional dependency group
+# in pyproject.toml so `pip install -r requirements.txt` can run cdk_preprovision.py.
+aws-cdk-lib>=2.150.0
+constructs>=10,<11
+cdklabs.generative-ai-cdk-constructs>=0.1.0
