@@ -158,8 +158,10 @@ credentials you used for CDK and rerun the helper command.
 Optional hosted deployment is covered at the bottom of Part 7 and in
 `deploy/README.md`. It requires AWS LangSmith Deployment access, a repo visible to
 the LangSmith GitHub app, and hosted runtime credentials generated with
-`uv run python scripts/create_deployment_user_key.py --write-env .env`. Without
-that setup, use local validation only or a facilitator demo.
+`uv run python scripts/create_deployment_user_key.py --write-env .env`. When
+deploying from `langchain-aws-samples`, select `examples/deepagents-aws-tour` as
+the app directory in the UI. Without that setup, use local validation only or a
+facilitator demo.
 
 EFS is a pattern note only unless the attendee environment can mount EFS. S3
 remains the hands-on durable backend.
