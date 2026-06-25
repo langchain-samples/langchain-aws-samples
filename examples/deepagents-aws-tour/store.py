@@ -23,7 +23,10 @@ load_dotenv(HERE / ".env", override=True)
 def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
-        raise RuntimeError(f"{name} is required for the S3-backed LangGraph store.")
+        raise RuntimeError(
+            f"{name} is required for the S3-backed LangGraph store. "
+            "Run scripts/register_gateway.py --write-env .env after CDK deploy."
+        )
     return value
 
 
