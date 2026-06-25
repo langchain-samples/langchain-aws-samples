@@ -199,9 +199,3 @@ use local validation only or a facilitator demo.
 
 EFS is a pattern note only unless the attendee environment can mount EFS. S3
 remains the hands-on durable backend.
-
-## Files not to ship
-
-The `.gitignore` excludes local secrets and generated state: `.env`, `.venv/`,
-`cdk.out/`, `.langgraph_api/`, `__pycache__/`, and `.ipynb_checkpoints/`. Keep
-`.env.example`, `uv.lock`, `data/`, and the notebook in the published folder.
