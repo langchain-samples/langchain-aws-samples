@@ -26,8 +26,8 @@ module plus installed packages.
 
 1. Bedrock model access enabled in `us-east-1` for Claude Haiku 4.5, Claude Sonnet
    4.6, and Titan Embed v2. Model access is account-level, not CloudFormation.
-2. AWS credentials with the policy output by `cdk_preprovision.py`.
-3. LangSmith on the AWS-region instance. Use
+2. AWS credentials that can deploy the CDK stack in `us-east-1`.
+3. An AWS-region LangSmith account and API key. Use
    `LANGSMITH_ENDPOINT=https://aws.api.smith.langchain.com`, not the UI URL.
 4. A local `.env` created from `.env.example`. Keep real credentials out of git.
 5. AWS CDK CLI installed for provisioning, for example `npm install -g aws-cdk`.
@@ -48,8 +48,8 @@ uv sync --extra cdk --python 3.12        # only needed to deploy cdk_preprovisio
 ## Configure LangSmith
 
 Create or sign in to an account on the AWS-region LangSmith instance:
-`https://aws.smith.langchain.com`. Create an API key from your LangSmith
-settings, then add it to `.env`:
+`https://aws.smith.langchain.com`. In that AWS-region LangSmith account, create
+an API key from settings, then update the LangSmith values in `.env`:
 
 ```bash
 LANGSMITH_TRACING=true
@@ -72,14 +72,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Open the notebook from that environment:
-
-```bash
-uv run jupyter lab deepagents_aws_tour.ipynb
-# or, from the activated requirements.txt environment:
-jupyter lab deepagents_aws_tour.ipynb
-```
-
 ## Provision AWS resources
 
 `cdk_preprovision.py` provisions the S3 bucket, Bedrock Knowledge Base, initial KB
@@ -87,6 +79,11 @@ ingestion, public Browser demo page, order/issue Lambdas, Cognito auth for Gatew
 Gateway invoke role, an attendee IAM policy, and a workshop-scoped IAM user for
 optional hosted AWS LangSmith UI deployment runtime credentials. It uses the seed
 docs in `data/` and the Browser demo page in `public_docs/`.
+
+Run the deploy, then run the helper. The helper reads the CloudFormation outputs,
+creates or reuses the AgentCore Gateway, registers the Lambda MCP targets, fetches
+the Cognito client secret without printing it, and writes the required values to
+`.env`.
 
 ```bash
 cdk bootstrap aws://<account-id>/us-east-1   # first time only for the AWS account/region
@@ -102,40 +99,6 @@ cdk deploy --app "python cdk_preprovision.py"
 python scripts/register_gateway.py --write-env .env
 ```
 
-After deploy, `scripts/register_gateway.py --write-env .env` creates or reuses
-the Gateway, registers the Lambda MCP targets, fetches the Cognito client secret
-without printing it, and writes the stack-derived values the notebook needs:
-`BEDROCK_KB_ID`, `AGENT_FILES_BUCKET`, `PUBLIC_SUPPORT_DOC_KEY`, `GATEWAY_URL`,
-`COGNITO_TOKEN_URL`, `COGNITO_CLIENT_ID`, and `COGNITO_CLIENT_SECRET`.
-
-The required workshop path does not need hosted deployment credentials. For the
-optional Part 7 AWS LangSmith UI deploy, `scripts/create_deployment_user_key.py --write-env .env`
-creates one access key for the CDK-created IAM user and writes `AWS_ACCESS_KEY_ID`,
-`AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and `AWS_REGION` into `.env` without
-printing the secret:
-
-```bash
-uv run python scripts/create_deployment_user_key.py --write-env .env
-```
-
-`AWS_SESSION_TOKEN` is cleared so stale temporary credentials do not shadow the
-deployment user. Rotate or delete this access key after the workshop.
-
-If the hosted deployment credentials need to be replaced, run:
-
-```bash
-uv run python scripts/create_deployment_user_key.py --rotate --write-env .env
-```
-
-Then update the hosted deployment env/secrets in the AWS LangSmith UI.
-
-If you created the optional hosted deployment access key, delete it before tearing
-down the stack so CloudFormation can delete the IAM user cleanly:
-
-```bash
-uv run python scripts/create_deployment_user_key.py --delete-existing
-```
-
 Attach the emitted `AttendeePolicyArn` to the AWS identity that will run the
 notebook. That policy grants access to the provisioned S3 bucket, the Bedrock
 Knowledge Base, Bedrock model invocation, AgentCore Browser/Code Interpreter, and
@@ -144,12 +107,15 @@ AgentCore Gateway APIs used by the tour.
 ## Run the notebook
 
 ```bash
-uv run python build_tour.py
 uv run jupyter lab deepagents_aws_tour.ipynb
 ```
 
-Edit cell content in `build_tour.py`, keep `tour.md` in sync, and regenerate the
-`.ipynb`.
+If you used the `requirements.txt` fallback, keep that environment activated and
+run:
+
+```bash
+jupyter lab deepagents_aws_tour.ipynb
+```
 
 ## Deploy access
 
@@ -190,12 +156,10 @@ If `aws sts get-caller-identity` returns `ExpiredToken`, refresh the same AWS
 credentials you used for CDK and rerun the helper command.
 
 Optional hosted deployment is covered at the bottom of Part 7 and in
-`deploy/README.md`. It uses the AWS LangSmith UI with a GitHub-backed deployment.
-Attendees who self-deploy should fork the workshop repo, connect GitHub in the AWS
-LangSmith UI, choose their fork/branch, and copy their stack-derived env vars/secrets
-from `.env` into the deployment settings. Cloud deployment requires LangSmith
-Deployment access and a repo visible to the LangSmith GitHub app; without that setup,
-use local validation only or a facilitator demo.
+`deploy/README.md`. It requires AWS LangSmith Deployment access, a repo visible to
+the LangSmith GitHub app, and hosted runtime credentials generated with
+`uv run python scripts/create_deployment_user_key.py --write-env .env`. Without
+that setup, use local validation only or a facilitator demo.
 
 EFS is a pattern note only unless the attendee environment can mount EFS. S3
 remains the hands-on durable backend.
