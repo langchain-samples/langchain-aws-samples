@@ -13,7 +13,8 @@ the optional hosted-deploy path.
 
 ## Required local validation
 
-Run from the repo root, where `langgraph.json` lives:
+Run from the sample directory, `examples/deepagents-aws-tour`, where
+`langgraph.json` lives:
 
 ```bash
 export LANGSMITH_ENDPOINT=https://aws.api.smith.langchain.com
@@ -45,7 +46,8 @@ are done testing.
 
 ## Required-path gotchas
 
-- **Run from the directory with `langgraph.json`** for local validation.
+- **Run from the directory with `langgraph.json`** for local validation. In
+  `langchain-aws-samples`, that directory is `examples/deepagents-aws-tour`.
 - **AWS helpers use your current shell AWS credentials**. If `aws sts get-caller-identity` or a helper returns `ExpiredToken`, refresh the same credentials you used for CDK and rerun the command.
 - **Gateway, KB, and S3 env vars are required at import time**. Run `uv run python scripts/register_gateway.py --write-env .env` after `cdk deploy` before the import smoke test or `langgraph dev`.
 - **Custom deployment stores are alpha**. The S3 store is registered in `langgraph.json` instead of passed as `create_deep_agent(..., store=...)`.
@@ -59,14 +61,15 @@ Use this path only when the attendee or facilitator has:
 - A fork or repo that the AWS LangSmith GitHub app can access.
 - Stack-derived runtime env vars from `.env`.
 
-Fork the workshop repo:
+Fork the workshop repo. If you are using `langchain-aws-samples`, fork that repo
+and deploy from the branch that contains `examples/deepagents-aws-tour`:
 
 ```bash
 # Option A: GitHub CLI
 gh repo fork <workshop-repo-owner>/<workshop-repo-name> --clone=false
 
 # Option B: browser
-# Open the workshop repo on GitHub, click Fork, and create a fork under your account or org.
+# Open langchain-aws-samples on GitHub, click Fork, and create a fork under your account or org.
 ```
 
 If you already have the repo locally and need to push a branch to your fork:
@@ -89,8 +92,8 @@ In `https://aws.smith.langchain.com`:
 2. Create a new deployment.
 3. Connect GitHub if prompted.
 4. Select the fork and branch.
-5. Use the repo root as the app directory.
-6. Use `langgraph.json` as the config.
+5. Use `examples/deepagents-aws-tour` as the app directory.
+6. Use `langgraph.json` as the config, relative to that app directory.
 7. Confirm the graph id is `support_tour`.
 8. Add the required env vars/secrets from `.env`.
 9. Deploy.

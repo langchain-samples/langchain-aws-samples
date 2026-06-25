@@ -22,7 +22,7 @@ AWS or LangChain product.
 | 7 | Deploy readiness + optional hosted deploy | LangGraph dev + AWS LangSmith UI | Deploy |
 | 8 | Review production loop | LangSmith UI | Monitor |
 
-> **Setup.** Run from the repo root. Shared secrets (`LANGSMITH_API_KEY`,
+> **Setup.** Run from the sample directory, `examples/deepagents-aws-tour`. Shared secrets (`LANGSMITH_API_KEY`,
 > `LANGSMITH_ENDPOINT=https://aws.api.smith.langchain.com`, AWS creds, `AWS_REGION`)
 > live in `.env`; `BEDROCK_KB_ID`, `AGENT_FILES_BUCKET`, `PUBLIC_SUPPORT_DOC_KEY`,
 > Gateway/Cognito values, and `LANGSMITH_PROJECT` come from the pre-provision stack
@@ -840,8 +840,9 @@ required path and the UI flow below as the optional hosted-deploy path.
 
 ### Required: local deploy-readiness validation
 
-Run the next notebook cell from the repo root. It performs the same checks as the
-terminal commands below, starts `langgraph dev` in the background, and polls `/ok`.
+Run the next notebook cell from the sample directory, the directory containing
+`langgraph.json`. It performs the same checks as the terminal commands below,
+starts `langgraph dev` in the background, and polls `/ok`.
 
 ```bash
 export LANGSMITH_ENDPOINT=https://aws.api.smith.langchain.com
@@ -971,14 +972,15 @@ Use this path only if you want your own hosted deployment after the workshop. It
 requires a GitHub account, a fork or repo that the LangSmith GitHub app can access,
 AWS LangSmith Deployment access, and the AWS runtime env vars from your stack.
 
-First, fork the workshop repo:
+First, fork the workshop repo. If you are using `langchain-aws-samples`, fork that
+repo and deploy from the branch that contains `examples/deepagents-aws-tour`:
 
 ```bash
 # Option A: GitHub CLI
 gh repo fork <workshop-repo-owner>/<workshop-repo-name> --clone=false
 
 # Option B: browser
-# Open the workshop repo on GitHub, click Fork, and create a fork under your account or org.
+# Open langchain-aws-samples on GitHub, click Fork, and create a fork under your account or org.
 ```
 
 If you already have this repo locally and want to push a branch to your fork:
@@ -998,8 +1000,9 @@ uv run python scripts/create_deployment_user_key.py --write-env .env
 ```
 
 In `https://aws.smith.langchain.com`, open **Deployments**, create a new deployment,
-connect GitHub, select your fork and branch, use the repo root as the app directory,
-and use `langgraph.json` as the config. The graph id is `support_tour`.
+connect GitHub, select your fork and branch, use `examples/deepagents-aws-tour` as
+the app directory, and use `langgraph.json` as the config relative to that app
+directory. The graph id is `support_tour`.
 
 Add these deployment env vars/secrets from your `.env`:
 
