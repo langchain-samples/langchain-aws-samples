@@ -13,6 +13,9 @@ langgraph-sdk
 python-dotenv
 boto3
 bedrock-agentcore
+playwright
+langchain-mcp-adapters
+httpx
 langchain-agentcore-codeinterpreter>=0.0.4
 openevals
 agentevals

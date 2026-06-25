@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "deepagents-aws-tour"
 version = "0.1.0"
@@ -15,6 +19,9 @@ dependencies = [
     "python-dotenv",
     "boto3",
     "bedrock-agentcore",
+    "playwright",
+    "langchain-mcp-adapters",
+    "httpx",
     "langchain-agentcore-codeinterpreter>=0.0.4",
     "openevals",
     "agentevals",
@@ -32,3 +39,11 @@ cdk = [
 
 [tool.uv]
 package = false
+
+[tool.setuptools]
+# Flat layout: list the runtime modules explicitly so the editable install used
+# by `langgraph build`/`deploy` (`uv pip install -e .`) does not fail setuptools
+# auto-discovery with "Multiple top-level modules discovered in a flat-layout".
+# Intentionally excludes build_tour.py and cdk_preprovision.py, which are not
+# imported by the deployed graph at runtime.
+py-modules = ["graph", "store", "tools", "mcp_client"]

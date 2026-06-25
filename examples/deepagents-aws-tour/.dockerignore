@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+credentials.json
+token.json
+
+# Python/local runtime
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Jupyter and local LangGraph state
+.ipynb_checkpoints/
+.langgraph_api/
+
+# CDK/generated files
+cdk.out/
+
+# Git and OS metadata
+.git/
+.DS_Store

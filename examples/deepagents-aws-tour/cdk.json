@@ -1,5 +1,5 @@
 {
-  "app": "uv run python cdk_preprovision.py",
+  "app": "uv run --python 3.12 python cdk_preprovision.py",
   "watch": {
     "include": ["**"],
     "exclude": ["README.md", "cdk*.json", "**/__pycache__", "tests"]

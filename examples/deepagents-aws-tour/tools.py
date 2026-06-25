@@ -2,18 +2,24 @@
 
 The notebook is fully self-contained and imports from this local module. Core pieces:
   - query_product_kb : a Bedrock Knowledge Base retrieval tool
+  - fetch_url        : an AgentCore Browser tool for public support docs
+  - execute_python  : an AgentCore Code Interpreter tool for ad-hoc analytics
   - S3Store          : a LangGraph BaseStore backed by S3 (for the /durable/ route)
-  - required_evidence_present : deterministic final-answer evaluator (Part 5)
-  - no_unapproved_refund     : code-based trajectory safety evaluator (Part 5)
+  - required_evidence_present : deterministic final-answer evaluator (Part 6)
+  - no_unapproved_refund     : code-based trajectory safety evaluator (Part 6)
 """
 from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import boto3
+from bedrock_agentcore.tools.browser_client import browser_session
+from bedrock_agentcore.tools.code_interpreter_client import CodeInterpreter
 from langchain_aws.retrievers.bedrock import AmazonKnowledgeBasesRetriever
 from langchain_core.tools import tool
 from langgraph.store.base import (
@@ -27,6 +33,10 @@ from langgraph.store.base import (
     SearchItem,
     SearchOp,
 )
+from playwright.sync_api import sync_playwright
+
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+PUBLIC_SUPPORT_DOC_KEY = "public-docs/sh-hub-v2-troubleshooting.html"
 
 # ============================================================================
 # Bedrock Knowledge Base query tool
@@ -40,8 +50,8 @@ def _get_retriever() -> AmazonKnowledgeBasesRetriever:
         kb_id = os.environ.get("BEDROCK_KB_ID")
         if not kb_id:
             raise RuntimeError(
-                "BEDROCK_KB_ID is not set. Deploy cdk_preprovision.py, then put its "
-                "BedrockKbId output into .env."
+                "BEDROCK_KB_ID is not set. Deploy cdk_preprovision.py, then run "
+                "scripts/register_gateway.py --write-env .env."
             )
         _retriever = AmazonKnowledgeBasesRetriever(
             knowledge_base_id=kb_id,
@@ -69,6 +79,94 @@ def query_product_kb(query: str) -> str:
         source = location.get("s3Location", {}).get("uri", "kb")
         passages.append(f"[{i}] {doc.page_content}\nSource: {source}")
     return "\n\n".join(passages)
+
+
+# ============================================================================
+# AgentCore Browser + Code Interpreter tools
+# ============================================================================
+def _with_retries(fn, *, attempts: int = 2, label: str = "operation") -> str:
+    """Retry a flaky AgentCore/browser operation, then return a useful failure."""
+    last_err = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as err:  # broad by design: tools should degrade in a live lab.
+            last_err = err
+            if attempt < attempts:
+                time.sleep(attempt)
+    return f"(couldn't complete {label} after {attempts} attempts: {last_err})"
+
+
+@tool
+def execute_python(code: str) -> str:
+    """Execute Python code in an AgentCore Code Interpreter session.
+
+    Use this for counts, filters, and simple analytics over data already provided
+    in the prompt. The session is fresh each call, so include imports and data in
+    the code string. Returns stdout and text results from the sandbox.
+    """
+    client = CodeInterpreter(AWS_REGION)
+    try:
+        client.start()
+        response = client.invoke("executeCode", {"language": "python", "code": code})
+        output = []
+        for event in response["stream"]:
+            result = event.get("result", {})
+            for item in result.get("content", []):
+                if item.get("type") == "text":
+                    output.append(item.get("text", ""))
+            if "error" in event:
+                output.append(f"ERROR: {event['error']}")
+        return "\n".join(output) if output else "(no output)"
+    finally:
+        try:
+            client.stop()
+        except Exception:
+            pass
+
+
+@tool
+def fetch_url(url: str) -> str:
+    """Fetch a public URL through AgentCore Browser and return visible text.
+
+    Use this to read public support documentation or external pages referenced
+    by a support ticket. Internal engineering facts still come from
+    query_product_kb. Returns up to 8000 characters of page text.
+    """
+
+    def _fetch() -> str:
+        with browser_session(AWS_REGION) as bclient:
+            ws_url, headers = bclient.generate_ws_headers()
+            with sync_playwright() as p:
+                browser = p.chromium.connect_over_cdp(ws_url, headers=headers)
+                ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+                page = ctx.pages[0] if ctx.pages else ctx.new_page()
+                page.goto(url, wait_until="networkidle", timeout=30000)
+                text = page.evaluate("document.body.innerText")
+                browser.close()
+                return (text or "")[:8000] or "(empty page)"
+
+    # Jupyter already has an asyncio loop. Playwright's sync API must run on a
+    # worker thread so it can connect to the remote browser cleanly.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: _with_retries(_fetch, label=f"fetching {url}")).result()
+
+
+def presign_public_support_doc(expires_in: int = 3600) -> str:
+    """Return a temporary URL for the preprovisioned public support article."""
+    bucket = os.environ.get("AGENT_FILES_BUCKET")
+    if not bucket:
+        raise RuntimeError(
+            "AGENT_FILES_BUCKET is required to presign the Browser demo support article. "
+            "Run scripts/register_gateway.py --write-env .env after CDK deploy."
+        )
+    key = os.environ.get("PUBLIC_SUPPORT_DOC_KEY", PUBLIC_SUPPORT_DOC_KEY)
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": bucket, "Key": key},
+        ExpiresIn=expires_in,
+    )
 
 
 # ============================================================================
