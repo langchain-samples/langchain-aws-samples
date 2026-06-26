@@ -173,7 +173,7 @@ def presign_public_support_doc(expires_in: int = 3600) -> str:
 # S3-backed LangGraph BaseStore (pair with StoreBackend for the /durable/ route)
 # ============================================================================
 def _s3_key(namespace: tuple[str, ...], key: str) -> str:
-    return "/".join(namespace) + "/" + key + ".json"
+    return _namespace_prefix(namespace) + key.lstrip("/") + ".json"
 
 
 def _namespace_prefix(namespace: tuple[str, ...]) -> str:
