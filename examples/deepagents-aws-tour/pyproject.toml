@@ -17,7 +17,7 @@ dependencies = [
     "langgraph-cli[inmem]>=0.4.27",
     "langgraph-sdk",
     "python-dotenv",
-    "boto3",
+    "boto3[crt]",
     "bedrock-agentcore",
     "playwright",
     "langchain-mcp-adapters",
