@@ -77,9 +77,10 @@ CELLS = [
         """
         ## 1. Load and validate configuration
 
-        Complete the upstream AgentCore Payments setup tutorial first. Copy
-        `.env.example` to `.env`, then add the Payment Manager ARN, user ID,
-        and instrument ID created by that tutorial.
+        Run `setup_agentcore_payments.ipynb` once before this notebook. It
+        creates the Payment Manager and embedded testnet wallet, then writes
+        the required ARN, user ID, and instrument ID into the same local
+        `.env` file.
 
         LangSmith is recommended but optional. If tracing is requested without
         an API key, this cell disables it instead of allowing background trace

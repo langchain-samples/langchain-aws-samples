@@ -9,6 +9,12 @@ This is a focused, single-agent example. It uses LangChain's
 `create_agent()` API, which runs on LangGraph, and attaches
 `AgentCorePaymentsMiddleware` once for automatic HTTP 402 handling.
 
+Everything needed is in this folder:
+
+1. `setup_agentcore_payments.ipynb` creates the AgentCore resources and
+   embedded Coinbase testnet wallet once.
+2. `agentcore_payments.ipynb` runs and traces the payment-enabled agent.
+
 ## What the agent does
 
 ~~~text
@@ -36,8 +42,8 @@ with no real-world value. They do not spend real USDC.
 Running the example can still create small, ordinary AWS charges:
 
 - Amazon Bedrock model inference.
-- AgentCore, CloudWatch, or related resources created by the prerequisite
-  setup tutorial.
+- AgentCore Payments API calls and managed credential storage created by the
+  setup notebook.
 
 AgentCore Payments is a preview service. APIs, availability, and pricing may
 change. Do not change the example to a mainnet network unless you deliberately
@@ -52,17 +58,12 @@ Before running the notebook, you need:
    `aws sts get-caller-identity`.
 3. Access to the configured Anthropic Claude model in Amazon Bedrock.
 4. An AWS account with access to the AgentCore Payments preview.
-5. An AgentCore Payment Manager, payment instrument, and testnet-funded
-   wallet. Complete the upstream
-   [AgentCore Payments setup tutorial](https://github.com/awslabs/agentcore-samples/tree/main/06-workshops/13-AgentCore-payments/00-getting-started/00-setup-agentcore-payments)
-   first.
-6. Recommended: an account and API key for the
+5. Permission to create and assume IAM roles, pass a service role, and create
+   AgentCore Payments and Secrets Manager resources.
+6. For the local setup path, a Coinbase account and a
+   [Coinbase Developer Platform](https://portal.cdp.coinbase.com/) project.
+7. Recommended: an account and API key for the
    [AWS-region LangSmith instance](https://aws.smith.langchain.com).
-
-The upstream setup creates the identifiers this example expects:
-`PAYMENT_MANAGER_ARN`, `USER_ID`, and `INSTRUMENT_ID`. It also explains
-how to fund the instrument with free testnet USDC and enable delegated
-signing.
 
 ## Install
 
@@ -83,19 +84,67 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ~~~
 
-## Configure
+## One-time local setup
 
-Fill in these values in your local `.env`:
+If your team already supplied a Payment Manager ARN, user ID, and funded
+instrument ID, put those values in `.env` and skip directly to
+**Configure LangSmith**. Otherwise, follow the local setup below.
+
+### 1. Get Coinbase CDP credentials
+
+In the [CDP Portal](https://portal.cdp.coinbase.com/):
+
+1. Create or select a project.
+2. Open **API Keys**, create a key, and retain its API Key ID and API Key
+   Secret.
+3. Open **Wallets → ServerWallet** and retain the Wallet Secret. Coinbase may
+   show it only once, so save it in a password manager.
+4. Open **Wallets → Embedded Wallet → Policies** and enable
+   **Delegated Signing**.
+
+Add only these setup inputs to your local `.env`:
 
 | Variable | Purpose |
 |---|---|
-| `AWS_REGION` | Region containing the AgentCore Payments resources and Bedrock model. |
-| `MODEL_ID` | Bedrock model ID used by the agent. |
-| `PAYMENT_MANAGER_ARN` | Payment Manager created by the setup tutorial. |
-| `USER_ID` | End-user ID associated with the payment instrument. |
-| `INSTRUMENT_ID` | Testnet-funded payment instrument. |
-| `NETWORK` | `ETHEREUM` for Base Sepolia, the default, or `SOLANA` for Solana Devnet. |
-| `PAID_API_URL` | Optional testnet x402 endpoint to call. |
+| `AWS_REGION` | Region where AgentCore Payments and Bedrock are available. |
+| `USER_ID` | Application-level label for the wallet owner; the default is `test-user-001`. |
+| `LINKED_EMAIL` | Email used to sign in to the embedded-wallet experience. |
+| `COINBASE_API_KEY_ID` | CDP API Key ID. |
+| `COINBASE_API_KEY_SECRET` | CDP API Key Secret. |
+| `COINBASE_WALLET_SECRET` | CDP ServerWallet secret. |
+| `NETWORK` | Keep this as `ETHEREUM`; the local setup creates a Base Sepolia wallet. |
+
+Do not fill `PAYMENT_MANAGER_ARN`, `PAYMENT_MANAGER_ID`, or
+`INSTRUMENT_ID`. The setup notebook generates them.
+
+### 2. Create the AWS resources and wallet
+
+~~~bash
+uv run jupyter lab setup_agentcore_payments.ipynb
+~~~
+
+Run the setup cells in order. They create four scoped IAM roles, a Coinbase
+credential provider, Payment Manager, connector, and embedded wallet. Resource
+identifiers are written back into the same local `.env` without printing
+credential values.
+
+### 3. Complete the two browser actions
+
+When the setup notebook prints the wallet address and WalletHub URL:
+
+1. Open [Circle Faucet](https://faucet.circle.com/), select **Base Sepolia**,
+   and fund the address with testnet USDC.
+2. Open WalletHub, sign in with `LINKED_EMAIL`, and grant signing permission
+   if prompted.
+3. Rerun the balance cell. A non-zero testnet balance completes setup.
+
+Use the faucet only. Do not use card, bank, or on-ramp options for this
+tutorial because those can involve assets with real-world value.
+
+The setup notebook fills the three values consumed by the agent:
+`PAYMENT_MANAGER_ARN`, `USER_ID`, and `INSTRUMENT_ID`.
+
+## Configure LangSmith
 
 To enable LangSmith tracing, also set:
 
@@ -116,7 +165,7 @@ Traces can contain prompts, requested URLs, API responses, and model output.
 Use test data here and configure appropriate redaction and retention controls
 before tracing sensitive production workloads.
 
-## Run
+## Run the payment agent
 
 ~~~bash
 uv run jupyter lab agentcore_payments.ipynb
@@ -160,14 +209,29 @@ service-level payment diagnostics.
 - Add an explicit approval policy before enabling mainnet or materially larger
   budgets.
 
+The setup notebook uses separate roles for control-plane and management
+operations. For notebook convenience, the payment agent itself uses your
+active AWS credential chain; that identity must be allowed to create sessions
+and process payments. Production applications should preserve role separation
+between the backend that creates budgets and the runtime that spends them.
+
+## Cleanup
+
+Payment sessions expire automatically, but setup resources persist. After
+testing, use the cleanup order documented at the end of
+`setup_agentcore_payments.ipynb`: instrument, connector, manager, credential
+provider/managed secret, then the four example-specific IAM roles.
+
 ## Troubleshooting
 
-- **Missing configuration:** confirm the three payment identifiers were copied
-  from the upstream setup tutorial into your local `.env`.
+- **Missing configuration:** run `setup_agentcore_payments.ipynb` first and
+  confirm it completed the non-zero balance check.
+- **Setup access denied:** confirm AgentCore Payments preview access and the
+  IAM permissions listed under Prerequisites.
 - **Access denied:** confirm AWS credentials, preview access, IAM permissions,
   region, and Bedrock model access.
 - **Payment rejected:** confirm the wallet has testnet USDC and delegated
-  signing is enabled for the selected wallet provider.
+  signing is enabled in the CDP project and WalletHub.
 - **No LangSmith trace:** confirm the AWS-region endpoint and API key are from
   the same LangSmith tenant.
 - **Paid endpoint unavailable:** public test endpoints can change; substitute
@@ -177,5 +241,7 @@ service-level payment diagnostics.
 
 This example is adapted from the
 [AWS AgentCore Payments middleware notebook](https://github.com/awslabs/agentcore-samples/blob/496c79e72b2a2e7318c8230e6707460bbed0883a/06-workshops/13-AgentCore-payments/00-getting-started/01-agents-payments-and-limits/langgraph_payment_agent_middleware.ipynb).
+The local setup is adapted from the
+[AWS AgentCore Payments setup notebook](https://github.com/awslabs/agentcore-samples/blob/3a8d5352daeeaf17d17e0b724e8927fd917f5f79/06-workshops/13-AgentCore-payments/00-getting-started/00-setup-agentcore-payments/setup_agentcore_payments.ipynb).
 See [NOTICE](./NOTICE) and [LICENSE-APACHE](./LICENSE-APACHE) for the upstream
 license and modification notice.
