@@ -5,3 +5,4 @@ One example per folder, lowercase and hyphenated. Each has its own README, setup
 | Example | What it shows |
 |---|---|
 | [deepagents-aws-tour](./deepagents-aws-tour) | Deep Agents on AWS with Bedrock, Bedrock Knowledge Bases, AgentCore Code Interpreter, S3, and AWS-region LangSmith. |
+| [agentcore-payments](./agentcore-payments) | AgentCore Payments middleware with a LangChain agent, x402 requests, budget enforcement, and AWS-region LangSmith tracing. |
