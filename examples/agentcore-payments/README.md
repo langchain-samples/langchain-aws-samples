@@ -51,8 +51,8 @@ You need:
 5. Access to the AgentCore Payments preview in your AWS account.
 6. AWS permission to create and assume IAM roles, pass a service role, and
    create AgentCore Payments and Secrets Manager resources.
-7. A Coinbase account and a
-   [Coinbase Developer Platform](https://portal.cdp.coinbase.com/) project.
+7. A free Coinbase Developer Platform account and project. Step 2 includes
+   account creation if you do not already have one.
 8. Optional: an API key for the
    [AWS-region LangSmith instance](https://aws.smith.langchain.com).
 
@@ -85,16 +85,19 @@ pip install -r requirements.txt
 The commands below use `uv run`. If you used the fallback, keep the virtual
 environment active and remove `uv run` from each command.
 
-## 2. Get the three Coinbase values
+## 2. Create the Coinbase account and get three values
 
-In the [Coinbase Developer Platform](https://portal.cdp.coinbase.com/):
-
-1. Create or select a project.
-2. Open **API Keys**, create a key, and save its API Key ID and API Key Secret.
-3. Open **Wallets → ServerWallet** and save the Wallet Secret. Coinbase may
+1. Open the [Coinbase Developer Platform](https://portal.cdp.coinbase.com/).
+2. If you are new to Coinbase, choose the sign-up option and complete the
+   email verification. Otherwise, sign in.
+3. Create or select a Developer Platform project.
+4. Open **API Keys**, create a key, and save its API Key ID and API Key Secret.
+5. Open **Wallets → ServerWallet** and save the Wallet Secret. Coinbase may
    show it only once, so store it in a password manager.
-4. Open **Wallets → Embedded Wallet → Policies** and enable
+6. Open **Wallets → Embedded Wallet → Policies** and enable
    **Delegated Signing**. This lets AgentCore sign test payments for the wallet.
+
+You do not need to add a payment method or buy cryptocurrency for this example.
 
 Never put these secret values in a notebook cell or commit them to Git.
 
