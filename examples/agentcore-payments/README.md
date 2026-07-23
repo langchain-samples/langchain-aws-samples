@@ -38,35 +38,73 @@ The notebook shows a USD 1.00 limit, a USD 0.50 limit, and a limit that is
 intentionally too small. The amounts are limits; the test calls do not spend
 real USDC.
 
-## Before you start
+## Journey at a glance
 
-You need:
+1. Confirm your AWS account has AgentCore Payments preview access and Bedrock
+   model access.
+2. Install the example.
+3. Create or sign in to Coinbase Developer Platform and collect three values.
+4. Add those values to `.env`.
+5. Run the setup notebook, fund the wallet with free test USDC, and approve
+   test-payment signing.
+6. Optionally create a LangSmith account and enable tracing.
+7. Run the agent notebook and check all three spending-limit examples.
+8. Delete the test resources when finished.
 
-1. Python 3.11 or newer. Python 3.12 is the tested version.
-2. [`uv`](https://docs.astral.sh/uv/getting-started/installation/) for the
-   recommended install path. A standard Python virtual environment also works.
-3. The [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-   and local AWS credentials.
-4. Access to the configured Anthropic Claude model in Amazon Bedrock.
-5. Access to the AgentCore Payments preview in your AWS account.
-6. AWS permission to create and assume IAM roles, pass a service role, and
-   create AgentCore Payments and Secrets Manager resources.
-7. A free Coinbase Developer Platform account and project. Step 2 includes
-   account creation if you do not already have one.
-8. Optional: an API key for the
-   [AWS-region LangSmith instance](https://aws.smith.langchain.com).
+No other repository is involved.
 
-Confirm that your AWS login works:
+## Accounts at a glance
+
+| Account or site | Needed? | What to do |
+|---|---|---|
+| AWS | Required | Use an account with AgentCore Payments preview access. Step 1 explains this. |
+| Coinbase Developer Platform | Required for local wallet setup | Create an account and project in step 3. No payment method or crypto purchase is needed. |
+| AWS-region LangSmith | Optional | Create or join an account in step 6 only if you want traces. |
+| Circle Faucet | No account | Paste the test wallet address into the public faucet. |
+| WalletHub | No separate account | Sign in with `LINKED_EMAIL` when the setup notebook gives you the link. |
+| Anthropic | No account | Bedrock provides the Claude model, so no Anthropic API key is needed. |
+
+## 1. Confirm AWS access
+
+If your company or the AgentCore Payments team provided an AWS account, use
+that account. If you have no AWS account, follow the
+[AWS account creation guide](https://aws.amazon.com/resources/create-account/).
+AWS signup may require a payment method, and AWS usage can incur charges.
+
+A newly created AWS account does **not** automatically have AgentCore Payments
+preview access. Ask the AgentCore Payments team or your AWS contact to:
+
+1. Enable the preview for your AWS account.
+2. Confirm the AWS region to use. This example defaults to `us-west-2`.
+3. Give your non-root AWS user or role permission to create and assume IAM
+   roles, pass a service role, and create AgentCore Payments and Secrets
+   Manager resources.
+
+Install the
+[AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+and configure it using your team's normal AWS sign-in method. If your team uses
+AWS IAM Identity Center, follow the
+[AWS CLI sign-in guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html).
+Do not create or use root-account access keys.
+
+Confirm that the terminal you will use for Jupyter can access AWS:
 
 ~~~bash
 aws sts get-caller-identity
 ~~~
 
-## 1. Install
+Finally, confirm that the Bedrock model named by `MODEL_ID` is available in the
+same region. See
+[Access Amazon Bedrock foundation models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html).
 
-Run these commands from this folder:
+## 2. Install
+
+You need Python 3.11 or newer; Python 3.12 is the tested version. Install
+[`uv`](https://docs.astral.sh/uv/getting-started/installation/), then run these
+commands from the repository root:
 
 ~~~bash
+cd examples/agentcore-payments
 cp .env.example .env
 uv sync --python 3.12
 ~~~
@@ -85,7 +123,7 @@ pip install -r requirements.txt
 The commands below use `uv run`. If you used the fallback, keep the virtual
 environment active and remove `uv run` from each command.
 
-## 2. Create the Coinbase account and get three values
+## 3. Create the Coinbase account and get three values
 
 1. Open the [Coinbase Developer Platform](https://portal.cdp.coinbase.com/).
 2. If you are new to Coinbase, choose the sign-up option and complete the
@@ -101,7 +139,7 @@ You do not need to add a payment method or buy cryptocurrency for this example.
 
 Never put these secret values in a notebook cell or commit them to Git.
 
-## 3. Fill in `.env`
+## 4. Fill in `.env`
 
 Open your local `.env`, review the provided defaults, and fill in the blank
 setup values:
@@ -112,9 +150,9 @@ setup values:
 | `MODEL_ID` | Keep the provided Bedrock model unless your account uses a different one. |
 | `USER_ID` | Any label for this test user. The provided `test-user-001` is fine. |
 | `LINKED_EMAIL` | The email you will use to sign in to the wallet page. |
-| `COINBASE_API_KEY_ID` | The Coinbase API Key ID from step 2. |
-| `COINBASE_API_KEY_SECRET` | The Coinbase API Key Secret from step 2. |
-| `COINBASE_WALLET_SECRET` | The Coinbase ServerWallet secret from step 2. |
+| `COINBASE_API_KEY_ID` | The Coinbase API Key ID from step 3. |
+| `COINBASE_API_KEY_SECRET` | The Coinbase API Key Secret from step 3. |
+| `COINBASE_WALLET_SECRET` | The Coinbase ServerWallet secret from step 3. |
 | `NETWORK` | Keep `ETHEREUM`; the notebook uses Base Sepolia testnet. |
 
 Leave the following values blank. The setup notebook creates and fills them:
@@ -133,9 +171,9 @@ Leave the following values blank. The setup notebook creates and fills them:
 If your team already gave you an existing funded test wallet and its three
 required values, you can skip the setup notebook. Fill in
 `PAYMENT_MANAGER_ARN`, `USER_ID`, and `INSTRUMENT_ID`, make sure `NETWORK`
-matches that wallet, and continue to step 5.
+matches that wallet, and continue to step 6.
 
-## 4. Create and fund the test wallet
+## 5. Create and fund the test wallet
 
 Open the setup notebook:
 
@@ -156,11 +194,20 @@ The notebook then prints a wallet address and a WalletHub URL:
 3. Return to the notebook and rerun the balance cell. Continue when it shows a
    balance greater than zero.
 
-These two browser actions cannot be automated by the notebook.
+The Circle faucet is public and does not require an account. WalletHub uses
+`LINKED_EMAIL` for sign-in and does not require a separate account. These two
+browser actions cannot be automated by the notebook.
 
-## 5. Optional: enable LangSmith tracing
+## 6. Optional: create a LangSmith account and enable tracing
 
-To record the agent, model, and tool calls, add these values to `.env`:
+Skip this section if you do not want traces. The agent works without LangSmith.
+
+To enable tracing:
+
+1. Open the [AWS-region LangSmith site](https://aws.smith.langchain.com/).
+2. Create an account, sign in, or join your team's existing workspace.
+3. Open settings, create an API key, and save it in your password manager.
+4. Add the following values to `.env`:
 
 ~~~bash
 LANGSMITH_TRACING=true
@@ -172,11 +219,11 @@ LANGSMITH_PROJECT=agentcore-payments
 Use a key from the AWS-region LangSmith site. A key from the standard
 `smith.langchain.com` site will not work with this endpoint.
 
-Tracing is optional. If no key is set, the notebook disables tracing and the
-agent still runs. Traces may contain prompts, URLs, API responses, and model
-output, so use test data only.
+The `agentcore-payments` project is created when its first trace arrives. If no
+key is set, the notebook disables tracing and the agent still runs. Traces may
+contain prompts, URLs, API responses, and model output, so use test data only.
 
-## 6. Run the agent
+## 7. Run the agent
 
 ~~~bash
 uv run jupyter lab agentcore_payments.ipynb
@@ -200,7 +247,7 @@ uv run python verify.py
 It confirms that both notebooks match their source files, the setup roles are
 defined, and the LangChain agent and payment integration can be created.
 
-## Cleanup
+## 8. Cleanup
 
 Payment sessions expire automatically, but the setup resources remain. The
 last section of `setup_agentcore_payments.ipynb` lists the cleanup commands and
