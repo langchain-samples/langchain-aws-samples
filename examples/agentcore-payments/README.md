@@ -128,14 +128,25 @@ environment active and remove `uv run` from each command.
 1. Open the [Coinbase Developer Platform](https://portal.cdp.coinbase.com/).
 2. If you are new to Coinbase, choose the sign-up option and complete the
    email verification. Otherwise, sign in.
-3. Create or select a Developer Platform project.
-4. Open **API Keys**, create a key, and save its API Key ID and API Key Secret.
-5. Open **Wallets → ServerWallet** and save the Wallet Secret. Coinbase may
+3. Use the project the portal opens for you. Coinbase may create a default
+   project automatically, so you might not see a separate project-creation
+   screen. If the portal shows a project switcher, create or select a project.
+4. Open **API Keys → Secret API keys**. Do **not** choose **Client API Key**;
+   client keys are for browser and mobile apps, while AgentCore needs a
+   server-side secret key.
+5. Create a Secret API Key. If Coinbase asks for a signing algorithm, keep the
+   default **Ed25519** option. Save the API Key ID and API Key Secret when they
+   are shown.
+6. Open **Wallets → ServerWallet** and save the Wallet Secret. Coinbase may
    show it only once, so store it in a password manager.
-6. Open **Wallets → Embedded Wallet → Policies** and enable
+7. Open **Wallets → Embedded Wallet → Policies** and enable
    **Delegated Signing**. This lets AgentCore sign test payments for the wallet.
 
 You do not need to add a payment method or buy cryptocurrency for this example.
+
+See Coinbase's
+[authentication guide](https://docs.cdp.coinbase.com/get-started/authentication/overview)
+for the difference between Secret and Client API Keys.
 
 Never put these secret values in a notebook cell or commit them to Git.
 
@@ -150,8 +161,8 @@ setup values:
 | `MODEL_ID` | Keep the provided Bedrock model unless your account uses a different one. |
 | `USER_ID` | Any label for this test user. The provided `test-user-001` is fine. |
 | `LINKED_EMAIL` | The email you will use to sign in to the wallet page. |
-| `COINBASE_API_KEY_ID` | The Coinbase API Key ID from step 3. |
-| `COINBASE_API_KEY_SECRET` | The Coinbase API Key Secret from step 3. |
+| `COINBASE_API_KEY_ID` | The ID from the Coinbase Secret API Key created in step 3. |
+| `COINBASE_API_KEY_SECRET` | The secret from that Coinbase Secret API Key. |
 | `COINBASE_WALLET_SECRET` | The Coinbase ServerWallet secret from step 3. |
 | `NETWORK` | Keep `ETHEREUM`; the notebook uses Base Sepolia testnet. |
 

@@ -76,12 +76,16 @@ CELLS = [
 
         In [Coinbase Developer Platform](https://portal.cdp.coinbase.com/):
 
-        1. Create or select a project.
-        2. Open **API Keys**, create a key, and retain its API Key ID and API
-           Key Secret.
-        3. Open **Wallets → ServerWallet** and retain the Wallet Secret. It may
+        1. Use the project the portal opens. Coinbase may create a default
+           project automatically; if you see a project switcher, create or
+           select a project there.
+        2. Open **API Keys → Secret API keys**. Do **not** choose
+           **Client API Key**; AgentCore needs a server-side secret key.
+        3. Create a Secret API Key. If asked for a signing algorithm, keep the
+           default **Ed25519** option. Retain its API Key ID and API Key Secret.
+        4. Open **Wallets → ServerWallet** and retain the Wallet Secret. It may
            be shown only once.
-        4. Open **Wallets → Embedded Wallet → Policies** and enable
+        5. Open **Wallets → Embedded Wallet → Policies** and enable
            **Delegated Signing**.
 
         Store the secrets in a password manager. For this local tutorial, add
