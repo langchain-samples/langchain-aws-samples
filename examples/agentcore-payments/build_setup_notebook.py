@@ -81,12 +81,19 @@ CELLS = [
            select a project there.
         2. Open **API Keys → Secret API keys**. Do **not** choose
            **Client API Key**; AgentCore needs a server-side secret key.
-        3. Create a Secret API Key. If asked for a signing algorithm, keep the
-           default **Ed25519** option. Retain its API Key ID and API Key Secret.
-        4. Open **Wallets → ServerWallet** and retain the Wallet Secret. It may
-           be shown only once.
-        5. Open **Wallets → Embedded Wallet → Policies** and enable
-           **Delegated Signing**.
+        3. Create a Secret API Key with nickname
+           `agentcore-payments-tutorial`. Select **Opt-out of IP allowlisting**
+           because AgentCore calls Coinbase from AWS; a private laptop address
+           such as `192.168...` will not work. If your organization requires
+           an allowlist, ask the AgentCore Payments team for supported outbound
+           IPs. Keep the default **Ed25519** signing algorithm.
+        4. Retain the API Key ID and API Key Secret when they are shown.
+        5. Open
+           [**Wallets → Non-custodial Wallet → Security**](https://portal.cdp.coinbase.com/wallets/non-custodial/security).
+           Do not choose Custodial Wallet or Agentic Wallet.
+        6. Under **Wallet Secret**, generate and retain the secret. It may be
+           shown only once.
+        7. On the same **Security** page, enable **Delegated Signing**.
 
         Store the secrets in a password manager. For this local tutorial, add
         them only to `.env` using the names shown in the next section.

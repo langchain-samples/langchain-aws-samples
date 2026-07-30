@@ -134,13 +134,21 @@ environment active and remove `uv run` from each command.
 4. Open **API Keys → Secret API keys**. Do **not** choose **Client API Key**;
    client keys are for browser and mobile apps, while AgentCore needs a
    server-side secret key.
-5. Create a Secret API Key. If Coinbase asks for a signing algorithm, keep the
-   default **Ed25519** option. Save the API Key ID and API Key Secret when they
-   are shown.
-6. Open **Wallets → ServerWallet** and save the Wallet Secret. Coinbase may
-   show it only once, so store it in a password manager.
-7. Open **Wallets → Embedded Wallet → Policies** and enable
-   **Delegated Signing**. This lets AgentCore sign test payments for the wallet.
+5. Create a Secret API Key with these settings:
+   - Nickname: `agentcore-payments-tutorial`
+   - IP allowlist: select **Opt-out of IP allowlisting**. AgentCore calls
+     Coinbase from AWS, so a private laptop address such as `192.168...` will
+     not work. If your organization requires an allowlist, ask the AgentCore
+     Payments team for supported outbound IPs instead of guessing.
+   - Advanced settings: keep the default **Ed25519** signing algorithm.
+6. Save the API Key ID and API Key Secret when they are shown.
+7. Open
+   [**Wallets → Non-custodial Wallet → Security**](https://portal.cdp.coinbase.com/wallets/non-custodial/security).
+   Do not choose Custodial Wallet or Agentic Wallet.
+8. Under **Wallet Secret**, generate the secret and save it immediately in a
+   password manager. Coinbase may show it only once.
+9. On the same **Security** page, enable **Delegated Signing**. This lets
+   AgentCore sign test payments for the wallet.
 
 You do not need to add a payment method or buy cryptocurrency for this example.
 
@@ -163,7 +171,7 @@ setup values:
 | `LINKED_EMAIL` | The email you will use to sign in to the wallet page. |
 | `COINBASE_API_KEY_ID` | The ID from the Coinbase Secret API Key created in step 3. |
 | `COINBASE_API_KEY_SECRET` | The secret from that Coinbase Secret API Key. |
-| `COINBASE_WALLET_SECRET` | The Coinbase ServerWallet secret from step 3. |
+| `COINBASE_WALLET_SECRET` | The Non-custodial Wallet Secret from step 3. |
 | `NETWORK` | Keep `ETHEREUM`; the notebook uses Base Sepolia testnet. |
 
 Leave the following values blank. The setup notebook creates and fills them:
@@ -264,6 +272,7 @@ Payment sessions expire automatically, but the setup resources remain. The
 last section of `setup_agentcore_payments.ipynb` lists the cleanup commands and
 the required order. Delete the wallet instrument first, then the connection,
 payment configuration, stored Coinbase connection, and four example roles.
+Then revoke the dedicated `agentcore-payments-tutorial` Coinbase API key.
 
 ## Troubleshooting
 
