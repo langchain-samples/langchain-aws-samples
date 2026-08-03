@@ -1,0 +1,19 @@
+AgentCore Payments with LangChain
+
+This example is adapted from the Amazon Bedrock AgentCore Payments sample
+"Enable Payment Limits on an Agent — LangGraph (Middleware)" at:
+
+https://github.com/awslabs/agentcore-samples/blob/496c79e72b2a2e7318c8230e6707460bbed0883a/06-workshops/13-AgentCore-payments/00-getting-started/01-agents-payments-and-limits/langgraph_payment_agent_middleware.ipynb
+
+The local setup notebook and helpers are adapted from:
+
+https://github.com/awslabs/agentcore-samples/blob/3a8d5352daeeaf17d17e0b724e8927fd917f5f79/06-workshops/13-AgentCore-payments/00-getting-started/00-setup-agentcore-payments/setup_agentcore_payments.ipynb
+
+https://github.com/awslabs/agentcore-samples/blob/ce97c48ffd76e142e3a7e8e888df9de1410c170d/06-workshops/13-AgentCore-payments/00-getting-started/utils.py
+
+The upstream work is licensed under the Apache License, Version 2.0. See
+LICENSE-APACHE in this directory. This version was reorganized and modified
+for the langchain-aws-samples repository, including self-contained
+configuration, a Coinbase/Base Sepolia setup path, AWS-region LangSmith
+tracing guidance, safer output handling, bounded dependencies, and simplified
+notebook flow.

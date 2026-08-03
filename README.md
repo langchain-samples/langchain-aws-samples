@@ -13,6 +13,7 @@ Build agents and RAG workflows on AWS with LangChain. These samples show how to 
 | Example | What it shows | Stack |
 |---|---|---|
 | [deepagents-aws-tour](./examples/deepagents-aws-tour) | Notebook-first tour of Deep Agents on AWS using Bedrock, Bedrock Knowledge Bases, AgentCore Code Interpreter, S3-backed state, and AWS-region LangSmith | Deep Agents + LangGraph + langchain-aws + Bedrock + LangSmith |
+| [agentcore-payments](./examples/agentcore-payments) | A payment-enabled LangChain agent with Coinbase testnet onboarding, automatic x402 handling, infrastructure-enforced budgets, and required LangSmith tracing, datasets, and evaluations | LangChain + LangGraph + langchain-aws + Bedrock + AgentCore Payments + LangSmith |
 
 ## Quickstart
 
