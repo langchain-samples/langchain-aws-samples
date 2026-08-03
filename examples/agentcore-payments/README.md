@@ -2,7 +2,8 @@
 
 Build a LangChain agent that can call an API that charges a small test payment.
 AgentCore Payments handles the payment and enforces a spending limit. LangSmith
-can trace the agent, model, and tool calls.
+traces the workflow, stores three policy cases as a dataset, scores the results,
+and compares two prompt variants.
 
 All example code and setup instructions are in this folder:
 
@@ -11,19 +12,27 @@ All example code and setup instructions are in this folder:
 2. `agentcore_payments.ipynb` runs the payment-enabled agent.
 
 You do not need to clone or run another repository.
+Follow this README in order. Do not start `agentcore_payments.ipynb` until you
+have completed the setup notebook through its balance check and finished the
+LangSmith account setup in step 6 below.
 
 ## Will this spend real money?
 
 The API payments use Base Sepolia, a test network, and free test USDC from a
 faucet. Test USDC has no real-world value.
 
-You may still see small AWS charges for Bedrock model calls, AgentCore API
-calls, and storing the Coinbase connection in AWS. To avoid spending real
-cryptocurrency:
+You may still see small charges for Bedrock model calls, the managed AWS secret,
+and LangSmith usage beyond your plan's included allowance. The agent notebook
+runs one tracing walkthrough, six experiment cases, and six judge evaluations.
+To avoid spending real cryptocurrency:
 
 - Keep `NETWORK=ETHEREUM`; this setup uses Base Sepolia, not Ethereum mainnet.
 - Fund the wallet only with the Circle testnet faucet.
 - Do not use Coinbase card, bank, or buy options.
+
+The tracing walkthrough and four successful experiment cases spend only
+faucet test USDC. The exact test amount depends on the paid endpoint's current
+price.
 
 ## What the agent does
 
@@ -34,9 +43,9 @@ cryptocurrency:
    retries the request.
 4. The API returns the data and the agent explains it.
 
-The notebook shows a USD 1.00 limit, a USD 0.50 limit, and a limit that is
-intentionally too small. The amounts are limits; the test calls do not spend
-real USDC.
+The notebook evaluates a USD 1.00 limit, a USD 0.50 limit, and a limit that is
+intentionally too small. These are infrastructure-enforced limits. Successful
+calls spend faucet USDC, which has no real-world value.
 
 ## Journey at a glance
 
@@ -47,11 +56,19 @@ real USDC.
 4. Add those values to `.env`.
 5. Run the setup notebook, fund the wallet with free test USDC, and approve
    test-payment signing.
-6. Optionally create a LangSmith account and enable tracing.
-7. Run the agent notebook and check all three spending-limit examples.
+6. Create or join an AWS-region LangSmith account and enable tracing and evals.
+7. Run the agent notebook to build the middleware and open-source agent,
+   inspect one trace, then validate two prompt versions like production
+   candidates.
 8. Delete the test resources when finished.
 
 No other repository is involved.
+
+This follows the Build and Test portions of LangChain's
+[Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle).
+It stops before deployment and shows how production traces and feedback would
+feed the next evaluation cycle. AgentCore spending limits enforce payment
+safety; LangSmith provides visibility and evidence.
 
 ## Accounts at a glance
 
@@ -59,7 +76,7 @@ No other repository is involved.
 |---|---|---|
 | AWS | Required | Use an account with AgentCore Payments preview access. Step 1 explains this. |
 | Coinbase Developer Platform | Required for local wallet setup | Create an account and project in step 3. No payment method or crypto purchase is needed. |
-| AWS-region LangSmith | Optional | Create or join an account in step 6 only if you want traces. |
+| AWS-region LangSmith | Required | Create or join an account in step 6 and enable tracing for the workshop. |
 | Circle Faucet | No account | Paste the test wallet address into the public faucet. |
 | WalletHub | No separate account | Sign in with `LINKED_EMAIL` when the setup notebook gives you the link. |
 | Anthropic | No account | Bedrock provides the Claude model, so no Anthropic API key is needed. |
@@ -200,32 +217,37 @@ Open the setup notebook:
 uv run jupyter lab setup_agentcore_payments.ipynb
 ~~~
 
-Run its cells from top to bottom. It creates four limited-purpose AWS roles,
-the AgentCore payment configuration, and an embedded Coinbase test wallet. It
-writes the generated IDs to `.env` without printing your Coinbase secrets.
+Run the cells from the top **through Step 9**, including the cell that prints
+the wallet address and WalletHub URL. **Stop before Step 10; do not use Run
+All yet.** By this point, the notebook has created four limited-purpose AWS
+roles, the AgentCore payment configuration, and an embedded Coinbase test
+wallet. It also writes the generated IDs to `.env` without printing your
+Coinbase secrets.
 
-The notebook then prints a wallet address and a WalletHub URL:
+Complete the required browser steps before continuing:
 
 1. Open the [Circle Faucet](https://faucet.circle.com/), choose
-   **Base Sepolia**, and send test USDC to the printed wallet address.
+   **Base Sepolia**, and send 20 test USDC to the printed wallet address.
 2. Open the printed WalletHub URL, sign in with `LINKED_EMAIL`, and approve
    signing if asked.
-3. Return to the notebook and rerun the balance cell. Continue when it shows a
-   balance greater than zero.
+3. Return to the notebook and run Step 10. Continue when it shows a balance
+   greater than zero. If the balance is still zero, wait briefly and rerun
+   Step 10.
 
 The Circle faucet is public and does not require an account. WalletHub uses
 `LINKED_EMAIL` for sign-in and does not require a separate account. These two
 browser actions cannot be automated by the notebook.
 
-## 6. Optional: create a LangSmith account and enable tracing
+## 6. Create a LangSmith account and enable tracing and evals
 
-Skip this section if you do not want traces. The agent works without LangSmith.
-
-To enable tracing:
+LangSmith is a required part of this workshop. You will use it to inspect
+traces, create a dataset, run evaluators, and compare prompt experiments.
 
 1. Open the [AWS-region LangSmith site](https://aws.smith.langchain.com/).
-2. Create an account, sign in, or join your team's existing workspace.
-3. Open settings, create an API key, and save it in your password manager.
+2. If you are new to LangSmith, create an account and workspace. Otherwise,
+   sign in or accept your team's workspace invitation.
+3. In that AWS-region workspace, open settings, create an API key, and save it
+   in your password manager.
 4. Add the following values to `.env`:
 
 ~~~bash
@@ -238,22 +260,93 @@ LANGSMITH_PROJECT=agentcore-payments
 Use a key from the AWS-region LangSmith site. A key from the standard
 `smith.langchain.com` site will not work with this endpoint.
 
-The `agentcore-payments` project is created when its first trace arrives. If no
-key is set, the notebook disables tracing and the agent still runs. Traces may
-contain prompts, URLs, API responses, and model output, so use test data only.
+The agent notebook creates two separate LangSmith views:
+
+- **Tracing Projects → the value of `LANGSMITH_PROJECT`** contains the
+  standalone automatic-payment walkthrough from Step 4. The provided value is
+  `agentcore-payments`.
+- **Datasets & Experiments → `agentcore-payments-policy-evals`** contains the
+  six evaluation runs and their traces.
+
+Experiment runs stay with their dataset experiments; they are not copied into
+the standalone tracing project. The notebook stops before running the agent if
+these LangSmith settings are missing or tracing is disabled. Traces and
+experiments may contain prompts, URLs, API responses, and model output, so use
+test data only.
 
 ## 7. Run the agent
+
+Before continuing, confirm both prerequisites are complete:
+
+- Step 10 of `setup_agentcore_payments.ipynb` shows a non-zero testnet USDC
+  balance.
+- You created or joined the AWS-region LangSmith account and added all four
+  LangSmith settings from step 6 to `.env`.
 
 ~~~bash
 uv run jupyter lab agentcore_payments.ipynb
 ~~~
 
-Run the cells from top to bottom. The notebook checks the required settings
-before it creates a payment session or calls the model. Payment sessions expire
-after 60 minutes.
+Run the cells in order, one section at a time. **Do not use Run All.** The
+notebook checks the required settings before it creates a dataset, payment
+session, or model call. It then walks you through this required LangSmith
+workflow:
 
-With LangSmith enabled, open the `agentcore-payments` project to compare the
-normal payment, fixed-limit, and insufficient-limit runs.
+1. Complete Step 2 to build the AgentCore Payments configuration, helper for
+   fresh limited sessions, and middleware. This is the core AWS integration.
+2. Complete Step 3 to create the LangChain agent and see that it runs on a
+   compiled LangGraph runtime.
+3. Run Step 4, then stop. Open the direct LangSmith trace link printed by the
+   notebook and follow the run from model call to HTTP 402, test payment,
+   successful retry, and final response.
+4. In Step 5, treat the agent as a production candidate and create three
+   reusable acceptance cases in a LangSmith dataset.
+5. Complete Steps 6–7 to build the repeatable target, two policy evaluators,
+   and an evidence-grounded Bedrock judge.
+6. Run Step 8 to validate the baseline. Stop and inspect its rows, evaluator
+   feedback, and traces under **Datasets & Experiments**.
+7. Run Step 9 to harden the reporting boundary. The model summarizes API data
+   while the application keeps AgentCore session totals authoritative; all
+   evaluator scores should remain passing.
+8. Complete Step 10: compare the two experiment names printed by the current
+   run and make a release decision. Older experiments remain available.
+
+Each insufficient-budget experiment intentionally prints insufficient-budget
+log lines. Those messages prove the limit blocked the payment; they are not
+notebook errors.
+
+Expected policy results:
+
+| Case | Expected outcome | Required safety result |
+|---|---|---|
+| Automatic USD 1.00 | Payment succeeds | Spending stays at or below USD 1.00 |
+| Explicit USD 0.50 | Payment succeeds | Spending stays at or below USD 0.50 |
+| Explicit USD 0.0001 | Payment is rejected | The limit is not exceeded |
+
+All three evaluator scores should be `True` for every row in both experiments.
+The insufficient-budget case prints payment-error logs by design; those logs
+show that AgentCore enforced the limit.
+
+The notebook runs each experiment sequentially and prints its LangSmith link
+and score summary. The second experiment changes only the prompt, letting you
+compare grounded response quality, latency, tokens, and model cost without
+changing the payment policy. Payment sessions expire after 60 minutes.
+
+In this workshop:
+
+- **Middleware** adds the paid HTTP tool and enforces the AgentCore payment
+  flow around the agent.
+- `create_agent()` is the LangChain API and returns the LangGraph runtime.
+- A **trace** records one full agent trajectory so you can understand model,
+  tool, payment, and final-response behavior.
+- A **dataset** preserves three reusable inputs and expected payment outcomes
+  so future changes are tested against the same behavior.
+- A **target** is the application LangSmith runs for every dataset row.
+- An **evaluator** turns a payment rule or quality criterion into a score.
+- An **experiment** runs one version over the complete dataset so versions can
+  be compared without changing the test cases.
+- A **tracing project** groups normal application runs. In this workshop it
+  contains the separate Step 4 walkthrough.
 
 ## Offline check
 
@@ -264,15 +357,38 @@ uv run python verify.py
 ~~~
 
 It confirms that both notebooks match their source files, the setup roles are
-defined, and the LangChain agent and payment integration can be created.
+defined, the LangChain payment integration can be created, and the trace,
+dataset, and grounded evaluator paths are wired correctly. You can run it
+before or after the workshop: it ignores normal saved cell outputs but still
+detects changed code or instructions.
 
 ## 8. Cleanup
 
-Payment sessions expire automatically, but the setup resources remain. The
-last section of `setup_agentcore_payments.ipynb` lists the cleanup commands and
-the required order. Delete the wallet instrument first, then the connection,
-payment configuration, stored Coinbase connection, and four example roles.
-Then revoke the dedicated `agentcore-payments-tutorial` Coinbase API key.
+Payment sessions expire automatically, but the other setup resources remain.
+When you are completely finished testing, return to the **Cleanup** section at
+the bottom of `setup_agentcore_payments.ipynb`:
+
+1. In the first cleanup cell, set `CLEANUP_CONFIRMATION` to
+   `DELETE AGENTCORE PAYMENTS TEST RESOURCES`, then run the cell. It deletes
+   the workshop payment sessions, wallet instrument, connector, manager,
+   stored Coinbase credential, and four example IAM roles in the required
+   order. It then blanks their generated IDs in `.env`.
+2. In Coinbase Developer Platform, open **API Keys → Secret API keys** and
+   revoke the dedicated `agentcore-payments-tutorial` key. The notebook cannot
+   safely do this for you.
+3. After revoking the key, optionally set `LOCAL_CLEAR_CONFIRMATION` to
+   `CLEAR LOCAL COINBASE VALUES` in the final cleanup cell and run it. This
+   blanks the local Coinbase values and linked email in `.env`.
+
+Each code cell is locked until its exact phrase is entered. The AWS cleanup is
+safe to rerun: an already deleted resource is skipped, and generated IDs stay
+in `.env` if cleanup stops before all AWS deletions finish. Fix the reported
+permission or dependency issue, then rerun the same cell. No cleanup cell
+prints resource IDs or secrets.
+
+LangSmith data is intentionally kept so you can return to the traces and
+compare later agent versions. If you eventually want to remove it, do that
+from the LangSmith UI rather than the AWS setup notebook.
 
 ## Troubleshooting
 
@@ -282,8 +398,23 @@ Then revoke the dedicated `agentcore-payments-tutorial` Coinbase API key.
   and region.
 - **The payment is rejected:** confirm the wallet has Base Sepolia test USDC
   and that signing was approved in both the Coinbase project and WalletHub.
-- **No LangSmith trace appears:** confirm the API key and endpoint are from the
-  same AWS-region LangSmith account.
+- **The dataset exists but no tracing project appears:** run Step 4 of the
+  agent notebook. Creating experiments does not create the separate project
+  named by `LANGSMITH_PROJECT`.
+- **Step 4 cannot find its trace:** confirm the API key and endpoint are from
+  the same AWS-region LangSmith account and that the key can create projects.
+  Rerun Step 4; it safely reuses the project and creates a new walkthrough.
+- **The dataset cell fails:** confirm your LangSmith key can create datasets in
+  the selected workspace. Rerunning the cell updates the same three examples.
+- **An experiment row has an error:** open that row in LangSmith first. Confirm
+  Bedrock model access, wallet balance, and WalletHub signing permission.
+- **A judge score is missing:** confirm the configured Bedrock model supports
+  structured output and inspect the evaluator error in the experiment.
+- **A groundedness score fails:** compare the final answer with the captured
+  HTTP evidence and trace. A model judge can be wrong; use its reasoning as a
+  finding to investigate, not an automatic verdict.
+- **A policy score fails:** inspect the trace and current endpoint price. A
+  changed endpoint is a real evaluation finding, not a reason to force a pass.
 - **The paid test URL fails:** public test services can change. Use another
   Base Sepolia x402 test URL and keep the limit small.
 

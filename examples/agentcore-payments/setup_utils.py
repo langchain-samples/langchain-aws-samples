@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import boto3
+from botocore.exceptions import ClientError
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_ENV_PATH = HERE / ".env"
@@ -60,6 +61,7 @@ PAYMENT_ROLE_DEFINITIONS = {
             "bedrock-agentcore:CreatePaymentSession",
             "bedrock-agentcore:GetPaymentSession",
             "bedrock-agentcore:ListPaymentSessions",
+            "bedrock-agentcore:DeletePaymentSession",
             "bedrock-agentcore:UpdatePaymentSession",
         ],
         "deny": ["bedrock-agentcore:ProcessPayment"],
@@ -185,6 +187,95 @@ def wait_for_status(
                 f"{timeout_seconds} seconds."
             )
         time.sleep(poll_seconds)
+
+
+def is_not_found(error: ClientError) -> bool:
+    """Return whether an AWS API error means the resource is already gone."""
+    code = error.response.get("Error", {}).get("Code", "")
+    return code in {"ResourceNotFoundException", "NotFoundException"}
+
+
+def wait_for_deleted(
+    get_resource,
+    label: str,
+    *,
+    timeout_seconds: int = 120,
+    poll_seconds: int = 5,
+    **kwargs: Any,
+) -> None:
+    """Poll until an AgentCore resource is deleted."""
+    deadline = time.time() + timeout_seconds
+    while True:
+        try:
+            response = get_resource(**kwargs)
+        except ClientError as error:
+            if is_not_found(error):
+                print(f"{label}: deleted")
+                return
+            raise
+
+        status = response.get("status") or response.get(
+            "paymentInstrument",
+            {},
+        ).get("status")
+        if status == "DELETED":
+            print(f"{label}: deleted")
+            return
+        if isinstance(status, str) and status.endswith("_FAILED"):
+            raise RuntimeError(
+                f"{label} entered terminal state {status}."
+            )
+        if time.time() >= deadline:
+            raise TimeoutError(
+                f"{label} was not deleted within {timeout_seconds} seconds."
+            )
+        time.sleep(poll_seconds)
+
+
+def delete_payment_roles(region: str) -> None:
+    """Delete only the four example roles and their known inline policies."""
+    iam = boto3.Session(region_name=region).client("iam")
+    known_policies = {
+        "AgentCorePaymentsAllow",
+        "AgentCorePaymentsDeny",
+        "AgentCorePaymentsPassRole",
+    }
+
+    for role_name in PAYMENT_ROLE_DEFINITIONS:
+        try:
+            paginator = iam.get_paginator("list_role_policies")
+            policy_names = {
+                policy_name
+                for page in paginator.paginate(RoleName=role_name)
+                for policy_name in page.get("PolicyNames", [])
+            }
+            unexpected = policy_names - known_policies
+            if unexpected:
+                raise RuntimeError(
+                    f"Refusing to delete {role_name}: it has unexpected "
+                    f"inline policies {sorted(unexpected)}. Review it in IAM."
+                )
+            for policy_name in sorted(policy_names):
+                iam.delete_role_policy(
+                    RoleName=role_name,
+                    PolicyName=policy_name,
+                )
+            iam.delete_role(RoleName=role_name)
+            print(f"IAM role deleted: {role_name}")
+        except iam.exceptions.NoSuchEntityException:
+            print(f"IAM role already absent: {role_name}")
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code", "")
+            if code == "NoSuchEntity":
+                print(f"IAM role already absent: {role_name}")
+                continue
+            if code == "DeleteConflict":
+                raise RuntimeError(
+                    f"Could not delete {role_name}. Remove any attached "
+                    "managed policies or instance-profile links in IAM, then "
+                    "rerun cleanup."
+                ) from error
+            raise
 
 
 def setup_payment_roles(region: str) -> dict[str, str]:

@@ -571,19 +571,358 @@ CELLS = [
         """
         ## Cleanup
 
-        Payment sessions created by the agent notebook expire automatically.
-        The resources created here persist.
+        Do not run cleanup until you have finished the agent notebook. This is
+        destructive: the embedded wallet instrument and AgentCore-managed
+        Coinbase credentials cannot be recovered from AgentCore afterward.
 
-        When finished, delete them in this order from the AgentCore and IAM
-        consoles:
+        The next cell is self-contained and safe to rerun. It reads only the
+        recorded resource identifiers from `.env`, prints whether each target
+        is recorded without printing its value, and requires an exact
+        confirmation phrase before deleting anything.
 
-        1. Payment instrument
-        2. Payment connector
-        3. Payment Manager
-        4. Payment credential provider and its managed secret
-        5. The four `LangChainAgentCorePayments...` IAM roles
+        It removes AWS resources in dependency order:
 
-        Do not delete them until you have finished testing the agent notebook.
+        1. Payment sessions created by the workshop
+        2. Embedded wallet instrument
+        3. Coinbase payment connector
+        4. Payment Manager
+        5. Coinbase credential provider and its AgentCore-managed secret
+        6. The four `LangChainAgentCorePayments...` IAM roles
+        7. Generated resource identifiers from the local `.env`
+
+        If cleanup stops, fix the reported dependency or permission issue and
+        rerun the same cell. Values are cleared from `.env` only after every
+        AWS deletion succeeds.
+        """
+    ),
+    _code(
+        """
+        import os
+
+        import boto3
+        from botocore.exceptions import ClientError
+        from dotenv import load_dotenv
+
+        from setup_utils import (
+            CONTROL_PLANE_ROLE,
+            MANAGEMENT_ROLE,
+            assume_role,
+            client_token,
+            delete_payment_roles,
+            is_not_found,
+            setup_payment_roles,
+            wait_for_deleted,
+            write_env,
+        )
+
+        load_dotenv(override=True)
+
+        EXPECTED_CLEANUP_CONFIRMATION = (
+            "DELETE AGENTCORE PAYMENTS TEST RESOURCES"
+        )
+        CLEANUP_CONFIRMATION = ""
+
+        cleanup_keys = [
+            "PAYMENT_MANAGER_ARN",
+            "PAYMENT_MANAGER_ID",
+            "PAYMENT_CONNECTOR_ID",
+            "CREDENTIAL_PROVIDER_NAME",
+            "CREDENTIAL_PROVIDER_ARN",
+            "INSTRUMENT_ID",
+            "WALLET_ADDRESS",
+            "CONTROL_PLANE_ROLE_ARN",
+            "MANAGEMENT_ROLE_ARN",
+            "PROCESS_PAYMENT_ROLE_ARN",
+            "RESOURCE_RETRIEVAL_ROLE_ARN",
+        ]
+        cleanup_values = {
+            key: os.environ.get(key, "").strip()
+            for key in cleanup_keys
+        }
+
+        print("AWS cleanup targets from .env:")
+        for key in cleanup_keys:
+            state = "recorded" if cleanup_values[key] else "not recorded"
+            print(f"- {key}: {state}")
+
+        if CLEANUP_CONFIRMATION != EXPECTED_CLEANUP_CONFIRMATION:
+            raise RuntimeError(
+                "Cleanup is locked. Set CLEANUP_CONFIRMATION to "
+                f"{EXPECTED_CLEANUP_CONFIRMATION!r} in this cell and rerun "
+                "it only after finishing the workshop."
+            )
+
+        cleanup_region = os.environ.get("AWS_REGION", "us-west-2")
+        cleanup_user_id = os.environ.get(
+            "USER_ID",
+            "test-user-001",
+        ).strip()
+        manager_arn = cleanup_values["PAYMENT_MANAGER_ARN"]
+        manager_id = cleanup_values["PAYMENT_MANAGER_ID"]
+        connector_id = cleanup_values["PAYMENT_CONNECTOR_ID"]
+        provider_name = cleanup_values["CREDENTIAL_PROVIDER_NAME"]
+        provider_arn = cleanup_values["CREDENTIAL_PROVIDER_ARN"]
+        instrument_id = cleanup_values["INSTRUMENT_ID"]
+
+        if bool(manager_arn) != bool(manager_id):
+            raise RuntimeError(
+                "PAYMENT_MANAGER_ARN and PAYMENT_MANAGER_ID must both be "
+                "recorded or both be blank before cleanup."
+            )
+        if connector_id and not manager_id:
+            raise RuntimeError(
+                "PAYMENT_CONNECTOR_ID is recorded without its Payment "
+                "Manager. Restore the manager values in .env or delete the "
+                "connector in the AgentCore console."
+            )
+        if instrument_id and not (manager_arn and connector_id):
+            raise RuntimeError(
+                "INSTRUMENT_ID is recorded without its manager and connector. "
+                "Restore those values in .env or delete the instrument in "
+                "the AgentCore console."
+            )
+        if provider_arn and not provider_name:
+            raise RuntimeError(
+                "CREDENTIAL_PROVIDER_ARN is recorded without "
+                "CREDENTIAL_PROVIDER_NAME. Restore the provider name in "
+                ".env or delete the credential provider in the AgentCore "
+                "console."
+            )
+
+        core_resources_recorded = any(
+            [
+                manager_arn,
+                manager_id,
+                connector_id,
+                provider_name,
+                instrument_id,
+            ]
+        )
+
+        if core_resources_recorded:
+            cleanup_base_session = boto3.Session(
+                region_name=cleanup_region
+            )
+            cleanup_base_session.client("sts").get_caller_identity()
+
+            # Update or recreate the tutorial roles so this cleanup cell has
+            # the current DeletePaymentSession permission.
+            cleanup_roles = setup_payment_roles(cleanup_region)
+
+            def cleanup_session(role_arn: str, session_name: str):
+                try:
+                    return assume_role(
+                        cleanup_base_session,
+                        role_arn,
+                        session_name,
+                    )
+                except ClientError as error:
+                    code = error.response.get("Error", {}).get("Code", "")
+                    if code in {"AccessDenied", "NoSuchEntity"}:
+                        print(
+                            "Could not assume a tutorial cleanup role; using "
+                            "the current AWS credentials instead."
+                        )
+                        return cleanup_base_session
+                    raise
+
+            cleanup_control_session = cleanup_session(
+                cleanup_roles["control_plane"],
+                "langchain-payments-cleanup-control",
+            )
+            cleanup_management_session = cleanup_session(
+                cleanup_roles["management"],
+                "langchain-payments-cleanup-management",
+            )
+            cleanup_control_client = cleanup_control_session.client(
+                "bedrock-agentcore-control",
+                endpoint_url=(
+                    "https://bedrock-agentcore-control."
+                    f"{cleanup_region}.amazonaws.com"
+                ),
+            )
+            cleanup_data_client = cleanup_management_session.client(
+                "bedrock-agentcore",
+                endpoint_url=(
+                    f"https://bedrock-agentcore.{cleanup_region}.amazonaws.com"
+                ),
+            )
+
+            def delete_or_skip(delete_call, label: str, **kwargs) -> bool:
+                try:
+                    delete_call(**kwargs)
+                    print(f"{label}: delete requested")
+                    return True
+                except ClientError as error:
+                    if is_not_found(error):
+                        print(f"{label}: already absent")
+                        return False
+                    raise
+
+            if manager_arn:
+                session_ids = []
+                next_token = None
+                while True:
+                    list_kwargs = {
+                        "paymentManagerArn": manager_arn,
+                        "userId": cleanup_user_id,
+                        "maxResults": 100,
+                    }
+                    if next_token:
+                        list_kwargs["nextToken"] = next_token
+                    try:
+                        response = (
+                            cleanup_data_client.list_payment_sessions(
+                                **list_kwargs
+                            )
+                        )
+                    except ClientError as error:
+                        if is_not_found(error):
+                            break
+                        raise
+                    session_ids.extend(
+                        session["paymentSessionId"]
+                        for session in response.get("paymentSessions", [])
+                        if session.get("paymentSessionId")
+                    )
+                    next_token = response.get("nextToken")
+                    if not next_token:
+                        break
+
+                print("Payment sessions found:", len(session_ids))
+                for payment_session_id in session_ids:
+                    requested = delete_or_skip(
+                        cleanup_data_client.delete_payment_session,
+                        "Payment session",
+                        paymentManagerArn=manager_arn,
+                        paymentSessionId=payment_session_id,
+                        userId=cleanup_user_id,
+                    )
+                    if requested:
+                        wait_for_deleted(
+                            cleanup_data_client.get_payment_session,
+                            "Payment session",
+                            paymentManagerArn=manager_arn,
+                            paymentSessionId=payment_session_id,
+                            userId=cleanup_user_id,
+                        )
+
+            if instrument_id:
+                requested = delete_or_skip(
+                    cleanup_data_client.delete_payment_instrument,
+                    "Payment instrument",
+                    paymentManagerArn=manager_arn,
+                    paymentConnectorId=connector_id,
+                    paymentInstrumentId=instrument_id,
+                    userId=cleanup_user_id,
+                )
+                if requested:
+                    wait_for_deleted(
+                        cleanup_data_client.get_payment_instrument,
+                        "Payment instrument",
+                        paymentManagerArn=manager_arn,
+                        paymentConnectorId=connector_id,
+                        paymentInstrumentId=instrument_id,
+                        userId=cleanup_user_id,
+                    )
+
+            if connector_id:
+                requested = delete_or_skip(
+                    cleanup_control_client.delete_payment_connector,
+                    "Payment connector",
+                    paymentManagerId=manager_id,
+                    paymentConnectorId=connector_id,
+                    clientToken=client_token(),
+                )
+                if requested:
+                    wait_for_deleted(
+                        cleanup_control_client.get_payment_connector,
+                        "Payment connector",
+                        paymentManagerId=manager_id,
+                        paymentConnectorId=connector_id,
+                    )
+
+            if manager_id:
+                requested = delete_or_skip(
+                    cleanup_control_client.delete_payment_manager,
+                    "Payment Manager",
+                    paymentManagerId=manager_id,
+                    clientToken=client_token(),
+                )
+                if requested:
+                    wait_for_deleted(
+                        cleanup_control_client.get_payment_manager,
+                        "Payment Manager",
+                        paymentManagerId=manager_id,
+                    )
+
+            if provider_name:
+                requested = delete_or_skip(
+                    cleanup_control_client.delete_payment_credential_provider,
+                    "Credential provider and managed secret",
+                    name=provider_name,
+                )
+                if requested:
+                    wait_for_deleted(
+                        cleanup_control_client.get_payment_credential_provider,
+                        "Credential provider and managed secret",
+                        name=provider_name,
+                    )
+
+        delete_payment_roles(cleanup_region)
+        write_env({key: "" for key in cleanup_keys})
+        for key in cleanup_keys:
+            os.environ[key] = ""
+
+        print("AWS cleanup complete.")
+        print(
+            "Next: revoke the Coinbase tutorial API key and optionally "
+            "clear local Coinbase values below."
+        )
+        """
+    ),
+    _markdown(
+        """
+        ### Finish Coinbase and local cleanup
+
+        Code in this repository cannot safely revoke your Coinbase credential.
+        In Coinbase Developer Platform, open **API Keys → Secret API keys** and
+        revoke the dedicated `agentcore-payments-tutorial` key.
+
+        After revoking it, optionally run the next cell to blank the local
+        Coinbase values and linked email in `.env`. It does not revoke or
+        delete anything in Coinbase by itself.
+
+        If you separately enabled AgentCore CloudWatch observability, review
+        and remove its tutorial-specific log groups from CloudWatch. This
+        example does not create those log groups directly.
+        """
+    ),
+    _code(
+        """
+        import os
+
+        from setup_utils import write_env
+
+        EXPECTED_LOCAL_CLEAR_CONFIRMATION = "CLEAR LOCAL COINBASE VALUES"
+        LOCAL_CLEAR_CONFIRMATION = ""
+        if LOCAL_CLEAR_CONFIRMATION != EXPECTED_LOCAL_CLEAR_CONFIRMATION:
+            raise RuntimeError(
+                "Local cleanup is locked. Revoke the Coinbase tutorial API "
+                "key first, then set LOCAL_CLEAR_CONFIRMATION to "
+                f"{EXPECTED_LOCAL_CLEAR_CONFIRMATION!r} and rerun this cell."
+            )
+
+        local_coinbase_keys = [
+            "COINBASE_API_KEY_ID",
+            "COINBASE_API_KEY_SECRET",
+            "COINBASE_WALLET_SECRET",
+            "LINKED_EMAIL",
+        ]
+        write_env({key: "" for key in local_coinbase_keys})
+        for key in local_coinbase_keys:
+            os.environ[key] = ""
+        print("Local Coinbase values cleared from .env.")
         """
     ),
     _markdown(
