@@ -5,16 +5,17 @@ AgentCore Payments handles the payment and enforces a spending limit. LangSmith
 traces the workflow, stores three policy cases as a dataset, scores the results,
 and compares two prompt variants.
 
-All example code and setup instructions are in this folder:
+All example code and Coinbase quick-start instructions are in this folder:
 
 1. `setup_agentcore_payments.ipynb` creates the AWS resources and Coinbase
    test wallet once.
 2. `agentcore_payments.ipynb` runs the payment-enabled agent.
 
-You do not need to clone or run another repository.
+For the Coinbase path, you do not need to clone or run another repository.
 Follow this README in order. Do not start `agentcore_payments.ipynb` until you
-have completed the setup notebook through its balance check and finished the
-LangSmith account setup in step 6 below.
+have completed either the included setup notebook through its balance check or
+an existing AgentCore Payments setup, and finished the LangSmith account setup
+in step 6 below.
 
 ## Will this spend real money?
 
@@ -49,6 +50,8 @@ calls spend faucet USDC, which has no real-world value.
 
 ## Journey at a glance
 
+The numbered quick start below uses Coinbase CDP:
+
 1. Confirm your AWS account has AgentCore Payments preview access and Bedrock
    model access.
 2. Install the example.
@@ -62,8 +65,6 @@ calls spend faucet USDC, which has no real-world value.
    candidates.
 8. Delete the test resources when finished.
 
-No other repository is involved.
-
 This follows the Build and Test portions of LangChain's
 [Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle).
 It stops before deployment and shows how production traces and feedback would
@@ -75,11 +76,33 @@ safety; LangSmith provides visibility and evidence.
 | Account or site | Needed? | What to do |
 |---|---|---|
 | AWS | Required | Use an account with AgentCore Payments preview access. Step 1 explains this. |
-| Coinbase Developer Platform | Required for local wallet setup | Create an account and project in step 3. No payment method or crypto purchase is needed. |
+| Coinbase Developer Platform | Required for the Coinbase quick start | Create an account and project in step 3. No payment method or crypto purchase is needed. |
 | AWS-region LangSmith | Required | Create or join an account in step 6 and enable tracing for the workshop. |
 | Circle Faucet | No account | Paste the test wallet address into the public faucet. |
 | WalletHub | No separate account | Sign in with `LINKED_EMAIL` when the setup notebook gives you the link. |
 | Anthropic | No account | Bedrock provides the Claude model, so no Anthropic API key is needed. |
+
+## Choose a payment provider
+
+This workshop uses Coinbase CDP as its tested, self-contained setup path. After
+AgentCore Payments is configured, the agent only needs a payment manager, user,
+instrument, and matching network. It can therefore use any wallet or payment
+instrument supported and configured through AgentCore Payments.
+
+Choose one path:
+
+- **Coinbase CDP:** Follow the numbered quick start below and use the included
+  setup notebook.
+- **Stripe/Privy or multiple providers:** Complete steps 1 and 2 below, then
+  use the AWS
+  [AgentCore Payments setup samples](https://github.com/awslabs/agentcore-samples/tree/main/01-features/08-agents-that-transact/00-getting-started/00-setup-agentcore-payments).
+  Provider-specific account guidance is in its
+  [providers folder](https://github.com/awslabs/agentcore-samples/tree/main/01-features/08-agents-that-transact/00-getting-started/00-setup-agentcore-payments/providers).
+- **Existing AgentCore Payments setup:** Skip this example's setup notebook.
+
+For either alternative path, add its `PAYMENT_MANAGER_ARN`, `USER_ID`,
+`INSTRUMENT_ID`, and matching `NETWORK` to `.env`, then continue at step 6.
+The agent, LangSmith tracing, dataset, and evaluation workflow are unchanged.
 
 ## 1. Confirm AWS access
 
@@ -140,7 +163,7 @@ pip install -r requirements.txt
 The commands below use `uv run`. If you used the fallback, keep the virtual
 environment active and remove `uv run` from each command.
 
-## 3. Create the Coinbase account and get three values
+## 3. Coinbase quick start: create the account and get three values
 
 1. Open the [Coinbase Developer Platform](https://portal.cdp.coinbase.com/).
 2. If you are new to Coinbase, choose the sign-up option and complete the
@@ -204,8 +227,8 @@ Leave the following values blank. The setup notebook creates and fills them:
 
 `.env` is ignored by Git. Do not commit it.
 
-If your team already gave you an existing funded test wallet and its three
-required values, you can skip the setup notebook. Fill in
+If you are using an AgentCore Payments setup created elsewhere, skip the setup
+notebook. Fill in
 `PAYMENT_MANAGER_ARN`, `USER_ID`, and `INSTRUMENT_ID`, make sure `NETWORK`
 matches that wallet, and continue to step 6.
 
@@ -278,8 +301,8 @@ test data only.
 
 Before continuing, confirm both prerequisites are complete:
 
-- Step 10 of `setup_agentcore_payments.ipynb` shows a non-zero testnet USDC
-  balance.
+- Step 10 of `setup_agentcore_payments.ipynb` shows a non-zero testnet balance,
+  or your alternative AgentCore Payments instrument is funded and ready.
 - You created or joined the AWS-region LangSmith account and added all four
   LangSmith settings from step 6 to `.env`.
 
@@ -365,8 +388,8 @@ detects changed code or instructions.
 ## 8. Cleanup
 
 Payment sessions expire automatically, but the other setup resources remain.
-When you are completely finished testing, return to the **Cleanup** section at
-the bottom of `setup_agentcore_payments.ipynb`:
+If you used the Coinbase quick start, return to the **Cleanup** section at the
+bottom of `setup_agentcore_payments.ipynb` when you are completely finished:
 
 1. In the first cleanup cell, set `CLEANUP_CONFIRMATION` to
    `DELETE AGENTCORE PAYMENTS TEST RESOURCES`, then run the cell. It deletes
@@ -389,6 +412,9 @@ prints resource IDs or secrets.
 LangSmith data is intentionally kept so you can return to the traces and
 compare later agent versions. If you eventually want to remove it, do that
 from the LangSmith UI rather than the AWS setup notebook.
+
+If you used an AWS provider setup sample instead, follow that sample's cleanup
+instructions for the resources it created.
 
 ## Troubleshooting
 
